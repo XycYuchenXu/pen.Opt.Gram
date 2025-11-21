@@ -12,6 +12,7 @@ mat_lasso(
   weak = F,
   Grp = NULL,
   C_init = NULL,
+  method = c("fista", "rcpp"),
   pb = NULL
 )
 }
@@ -29,6 +30,8 @@ mat_lasso(
 \item{Grp}{The group assignment matrix, indexes starting from 1}
 
 \item{C_init}{The initial value of C}
+
+\item{method}{The method to use: "fista" or "rcpp"}
 
 \item{pb}{A progress bar function}
 }

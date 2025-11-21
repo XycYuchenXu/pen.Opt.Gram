@@ -100,6 +100,7 @@ group_lasso_gram = function(xtx, xty, Grp, lambda, beta0 = NULL,
 #' @param weak True for weak Lasso, False for standard Lasso
 #' @param Grp The group assignment matrix, indexes starting from 1
 #' @param C_init The initial value of C
+#' @param method The method to use: "fista" or "rcpp"
 #' @param pb A progress bar function
 #'
 #' @return C The estimated coefficients matrix
@@ -123,16 +124,27 @@ group_lasso_gram = function(xtx, xty, Grp, lambda, beta0 = NULL,
 #' # Estimate matrix with Lasso penalty
 #' C_est <- mat_lasso(G, g, lambda, alpha = 1, weak = FALSE)
 mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL,
-                     C_init = NULL, pb = NULL){
+                     C_init = NULL, method = c("fista", "rcpp"), pb = NULL){
   p = nrow(G)
   C_temp = matrix(0, p, p)
   lambda0 = lambda * alpha
   if (is.null(C_init)) {C_init = C_temp}
+
+  method <- match.arg(method)
   if (is.null(Grp)) {
-    for (i in 1:p) {
-      C_temp[i,] = wlasso_gram(G, g[,i], lambda0, C_init[i,], weak, max_iter = 200,
-                               tolerance = 1e-4)
-      if (!is.null(pb)) {pb()}
+    if (method == "fista") {
+      for (i in 1:p) {
+        C_temp[,i] = fista_lasso(G, g[,i], C_init[,i], lambda0,
+                                 rep(1, p), weak, max_iter = 200,
+                                 tolerance = 1e-4)
+        if (!is.null(pb)) {pb()}
+      }
+    } else {
+      for (i in 1:p) {
+        C_temp[,i] = wlasso_gram(G, g[,i], lambda0, C_init[,i], weak, max_iter = 200,
+                                 tolerance = 1e-4)
+        if (!is.null(pb)) {pb()}
+      }
     }
   } else {
     C_temp = group_lasso_gram(G, g, Grp, lambda0, C_init,
@@ -198,7 +210,7 @@ mat_nuclear <- function(G, g, lambda, X0 = NULL, max_iter = 1000,
 
   for (iter in 1:max_iter) {
     # Gradient step
-    Grad <- Z %*% G - t(g)
+    Grad <- tcrossprod(Z, G) - t(g)
     Y <- Z - eta * Grad
 
     # SVT
