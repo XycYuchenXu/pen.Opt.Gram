@@ -121,6 +121,8 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL,
 #' @param Grp The group assignment matrix, indexes starting from 1
 #' @param C_init The initial value of C
 #' @param method The method to use: "fista" or "rcpp"
+#' @param max_iter The maximum number of iterations
+#' @param tolerance The convergence tolerance
 #' @param pb A progress bar function
 #'
 #' @return C The estimated coefficients matrix
@@ -143,8 +145,9 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL,
 #' lambda <- 0.1
 #' # Estimate matrix with Lasso penalty
 #' C_est <- mat_lasso(G, g, lambda, alpha = 1, weak = FALSE)
-mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL,
-                     C_init = NULL, method = c("fista", "rcpp"), pb = NULL){
+mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL, C_init = NULL,
+                     method = c("fista", "rcpp"), max_iter = 200, tolerance = 1e-4,
+                     pb = NULL){
   p = nrow(G)
   C_temp = matrix(0, p, p)
   lambda0 = lambda * alpha
@@ -155,20 +158,20 @@ mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL,
     if (method == "fista") {
       for (i in 1:p) {
         C_temp[i,] = fista_lasso(G, g[,i], C_init[i,], lambda0,
-                                 rep(1, p), weak, max_iter = 200,
-                                 tolerance = 1e-4)
+                                 rep(1, p), weak, max_iter = max_iter,
+                                 tolerance = tolerance)
         if (!is.null(pb)) {pb()}
       }
     } else {
       for (i in 1:p) {
-        C_temp[i,] = wlasso_gram(G, g[,i], lambda0, C_init[i,], weak, max_iter = 200,
-                                 tolerance = 1e-4)
+        C_temp[i,] = wlasso_gram(G, g[,i], lambda0, C_init[i,], weak, max_iter = max_iter,
+                                 tolerance = tolerance)
         if (!is.null(pb)) {pb()}
       }
     }
   } else {
     C_temp = group_lasso_gram(G, g, Grp, lambda0, C_init,
-                              max_iter = 200, tolerance = 1e-4)
+                              max_iter = max_iter, tolerance = tolerance)
   }
 
   return(C_temp)

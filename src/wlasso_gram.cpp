@@ -1,5 +1,6 @@
 // src/wlasso_gram.cpp
 #include <RcppArmadillo.h>
+#include <cmath>
 // [[Rcpp::depends(RcppArmadillo)]]
 
 using namespace Rcpp;
@@ -26,7 +27,6 @@ arma::rowvec lasso_row_cpp(const arma::mat& xtx,
 
   // Coordinate descent for this row
   for (int iter = 0; iter < max_iter; iter++) {
-
     for (int j = 0; j < p; j++) {
 
       // Compute residual: xty_i[j] - xtx[j,:] * x_curr^T (excluding j-th component)
@@ -55,10 +55,7 @@ arma::rowvec lasso_row_cpp(const arma::mat& xtx,
     }
 
     // Check convergence
-    double norm_diff = norm(x_curr - x_prev, 2);
-    double norm_prev = norm(x_prev, 2);
-
-    if (norm_prev < 1e-10 ? norm_diff < tolerance : norm_diff / norm_prev < tolerance) {
+    if (norm(x_curr - x_prev, 'inf') < tolerance) {
       break;
     }
 

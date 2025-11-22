@@ -93,8 +93,7 @@ arma::mat group_lasso_cpp(const arma::mat& xtx,
     }
 
     // Check convergence
-    double norm0 = norm(X0, "fro");
-    if (norm0 == 0.0 || norm(X_curr - X_prev, "fro") / norm0 < tolerance) {
+    if (norm(X_curr - X_prev, "inf") < tolerance) {
       break;
     }
 
