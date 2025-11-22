@@ -11,6 +11,7 @@
 #' @return beta The estimated coefficients
 #' @import Rcpp
 #' @import RcppArmadillo
+#' @importFrom MASS ginv
 #' @importFrom Rdpack reprompt
 #' @export
 #'
@@ -34,7 +35,17 @@ wlasso_gram = function(xtx, xty, lambda, beta0 = NULL, weak = T, max_iter = 1000
     p = nrow(xtx)
     beta0 = rep(0, p)
   }
-  return(lasso_row_cpp(xtx, xty, lambda, beta0, weak, max_iter, tolerance))
+  beta_est = lasso_row_cpp(xtx, xty, lambda, beta0, weak, max_iter, tolerance)
+
+  if (!weak) {
+    # Debiasing step
+    supp_ind = which(beta_est != 0);
+    Si_l0 = length(supp_ind);
+    if (Si_l0 > 0) {
+      beta_est[supp_ind] = crossprod(ginv(xtx[supp_ind, supp_ind]), xty[supp_ind])
+    }
+  }
+  return(beta_est)
 }
 
 #' Solve group sparse regression
@@ -52,6 +63,7 @@ wlasso_gram = function(xtx, xty, lambda, beta0 = NULL, weak = T, max_iter = 1000
 #' @import RcppArmadillo
 #' @importFrom Rdpack reprompt
 #' @importFrom irlba irlba
+#' @importFrom MASS ginv
 #' @export
 #'
 #' @examples
@@ -88,6 +100,15 @@ group_lasso_gram = function(xtx, xty, Grp, lambda, beta0 = NULL,
   if (is.null(beta0)) {beta0 = matrix(0, p, p)}
   C = group_lasso_cpp(xtx, xty, Grp, lambda, beta0, eta,
                       max_iter = max_iter, tolerance = tolerance)
+
+  for (i in 1:p) {
+    supp_ind = which(C[i,] != 0)
+    Si_l0 = length(supp_ind)
+
+    if (Si_l0 > 0) {
+      C[i,supp_ind] = crossprod(ginv(xtx[supp_ind, supp_ind]), xty[supp_ind,i])
+    }
+  }
   return(C)
 }
 

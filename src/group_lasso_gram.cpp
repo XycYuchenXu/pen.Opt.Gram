@@ -100,25 +100,5 @@ arma::mat group_lasso_cpp(const arma::mat& xtx,
 
     X_prev = X_curr;
   }
-
-  // Debiasing step
-  for (int i = 0; i < p; i++) {
-    uvec supp_ind = find(X_curr.row(i) != 0);
-    int Si_l0 = supp_ind.n_elem;
-
-    if (Si_l0 > 0) {
-      mat xtx_sub = xtx(supp_ind, supp_ind);
-      vec xty_sub = xty.col(i);
-      xty_sub = xty_sub(supp_ind);
-
-      // Solve using pseudo-inverse
-      vec beta = pinv(xtx_sub) * xty_sub;
-
-      for (int j = 0; j < Si_l0; j++) {
-        X_curr(i, supp_ind(j)) = beta(j);
-      }
-    }
-  }
-
   return X_curr;
 }

@@ -64,23 +64,5 @@ arma::rowvec lasso_row_cpp(const arma::mat& xtx,
 
     x_prev = x_curr;
   }
-
-  // Debiasing step
-  if (!weak) {
-    uvec supp_ind = find(x_curr != 0);
-    int Si_l0 = supp_ind.n_elem;
-
-    if (Si_l0 > 0) {
-      mat xtx_sub = xtx(supp_ind, supp_ind);
-      vec xty_sub = xty_i(supp_ind);
-
-      vec beta = pinv(xtx_sub) * xty_sub;
-
-      for (int j = 0; j < Si_l0; j++) {
-        x_curr(supp_ind(j)) = beta(j);
-      }
-    }
-  }
-
   return x_curr;
 }
