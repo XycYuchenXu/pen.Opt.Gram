@@ -5,8 +5,8 @@
 \title{Solve group sparse regression}
 \usage{
 group_lasso_gram(
-  xtx,
-  xty,
+  G,
+  g,
   Grp,
   lambda,
   beta0 = NULL,
@@ -15,9 +15,9 @@ group_lasso_gram(
 )
 }
 \arguments{
-\item{xtx}{The Gram matrix X'X / n}
+\item{G}{The Gram matrix X'X / n}
 
-\item{xty}{The matrix X'y / n}
+\item{g}{The matrix X'y / n}
 
 \item{Grp}{The group assignment matrix, indexes starting from 1}
 

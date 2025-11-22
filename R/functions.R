@@ -1,7 +1,7 @@
 #' Solve (weak) Lasso regression
 #'
-#' @param xtx The Gram matrix X'X
-#' @param xty The vector X'y
+#' @param G The Gram matrix X'X / n
+#' @param g The vector X'y / n
 #' @param lambda The regularization parameter
 #' @param beta0 The initial value of beta
 #' @param weak True for weak Lasso, False for standard Lasso
@@ -29,20 +29,20 @@
 #' lambda <- 0.1
 #' # Estimate coefficients with weak Lasso penalty
 #' beta_est <- wlasso_gram(G, g, lambda, weak = TRUE)
-wlasso_gram = function(xtx, xty, lambda, beta0 = NULL, weak = T, max_iter = 1000,
+wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, max_iter = 1000,
                        tolerance = 1e-6){
   if (is.null(beta0)) {
-    p = nrow(xtx)
+    p = nrow(G)
     beta0 = rep(0, p)
   }
-  beta_est = lasso_row_cpp(xtx, xty, lambda, beta0, weak, max_iter, tolerance)
+  beta_est = lasso_row_cpp(G, g, lambda, beta0, weak, max_iter, tolerance)
 
   if (!weak) {
     # Debiasing step
-    supp_ind = which(beta_est != 0);
-    Si_l0 = length(supp_ind);
+    supp_ind = which(beta_est != 0)
+    Si_l0 = length(supp_ind)
     if (Si_l0 > 0) {
-      beta_est[supp_ind] = crossprod(ginv(xtx[supp_ind, supp_ind]), xty[supp_ind])
+      beta_est[supp_ind] = crossprod(ginv(G[supp_ind, supp_ind]), g[supp_ind])
     }
   }
   return(beta_est)
@@ -50,8 +50,8 @@ wlasso_gram = function(xtx, xty, lambda, beta0 = NULL, weak = T, max_iter = 1000
 
 #' Solve group sparse regression
 #'
-#' @param xtx The Gram matrix X'X / n
-#' @param xty The matrix X'y / n
+#' @param G The Gram matrix X'X / n
+#' @param g The matrix X'y / n
 #' @param Grp The group assignment matrix, indexes starting from 1
 #' @param lambda The regularization parameter
 #' @param beta0 The initial value of beta
@@ -82,7 +82,7 @@ wlasso_gram = function(xtx, xty, lambda, beta0 = NULL, weak = T, max_iter = 1000
 #' lambda <- 0.1
 #' # Estimate matrix with group Lasso penalty
 #' C_est <- group_lasso_gram(G, g, Grp, lambda)
-group_lasso_gram = function(xtx, xty, Grp, lambda, beta0 = NULL,
+group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL,
                             max_iter = 1000, tolerance = 1e-6){
   p = nrow(Grp)
   unique_vals <- unique(as.vector(Grp))
@@ -91,22 +91,21 @@ group_lasso_gram = function(xtx, xty, Grp, lambda, beta0 = NULL,
   Grp <- matrix(factor_indices, nrow = p)
   eta <- tryCatch({
     # Try irlba first (fast)
-    1 / irlba(xtx, 1, 1, maxit = 2000)$d[1]
+    1 / irlba(G, 1, 1, maxit = 2000)$d[1]
   }, error = function(e) {
     # Fall back to full SVD if irlba fails
-    1 / svd(xtx, nu = 0, nv = 0)$d[1]
+    1 / svd(G, nu = 0, nv = 0)$d[1]
   })
   if (is.infinite(eta)) {return(matrix(0, p, p))}
   if (is.null(beta0)) {beta0 = matrix(0, p, p)}
-  C = group_lasso_cpp(xtx, xty, Grp, lambda, beta0, eta,
+  C = group_lasso_cpp(G, g, Grp, lambda, beta0, eta,
                       max_iter = max_iter, tolerance = tolerance)
 
   for (i in 1:p) {
     supp_ind = which(C[i,] != 0)
     Si_l0 = length(supp_ind)
-
     if (Si_l0 > 0) {
-      C[i,supp_ind] = crossprod(ginv(xtx[supp_ind, supp_ind]), xty[supp_ind,i])
+      C[i,supp_ind] = crossprod(ginv(G[supp_ind, supp_ind]), g[supp_ind,i])
     }
   }
   return(C)
@@ -155,14 +154,14 @@ mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL,
   if (is.null(Grp)) {
     if (method == "fista") {
       for (i in 1:p) {
-        C_temp[,i] = fista_lasso(G, g[,i], C_init[,i], lambda0,
+        C_temp[i,] = fista_lasso(G, g[,i], C_init[i,], lambda0,
                                  rep(1, p), weak, max_iter = 200,
                                  tolerance = 1e-4)
         if (!is.null(pb)) {pb()}
       }
     } else {
       for (i in 1:p) {
-        C_temp[,i] = wlasso_gram(G, g[,i], lambda0, C_init[,i], weak, max_iter = 200,
+        C_temp[i,] = wlasso_gram(G, g[,i], lambda0, C_init[i,], weak, max_iter = 200,
                                  tolerance = 1e-4)
         if (!is.null(pb)) {pb()}
       }

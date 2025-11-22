@@ -5,8 +5,8 @@
 \title{Solve (weak) Lasso regression}
 \usage{
 wlasso_gram(
-  xtx,
-  xty,
+  G,
+  g,
   lambda,
   beta0 = NULL,
   weak = T,
@@ -15,9 +15,9 @@ wlasso_gram(
 )
 }
 \arguments{
-\item{xtx}{The Gram matrix X'X}
+\item{G}{The Gram matrix X'X / n}
 
-\item{xty}{The vector X'y}
+\item{g}{The vector X'y / n}
 
 \item{lambda}{The regularization parameter}
 
