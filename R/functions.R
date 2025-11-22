@@ -42,7 +42,8 @@ wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, max_iter = 1000,
     supp_ind = which(beta_est != 0)
     Si_l0 = length(supp_ind)
     if (Si_l0 > 0) {
-      beta_est[supp_ind] = crossprod(ginv(G[supp_ind, supp_ind]), g[supp_ind])
+      beta_est[supp_ind] = crossprod(ginv(G[supp_ind, supp_ind, drop = F], tol = 1e-6),
+                                     g[supp_ind])
     }
   }
   return(beta_est)
@@ -94,7 +95,7 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL,
     1 / irlba(G, 1, 1, maxit = 2000)$d[1]
   }, error = function(e) {
     # Fall back to full SVD if irlba fails
-    1 / svd(G, nu = 0, nv = 0)$d[1]
+    1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
   })
   if (is.infinite(eta)) {return(matrix(0, p, p))}
   if (is.null(beta0)) {beta0 = matrix(0, p, p)}
@@ -105,7 +106,8 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL,
     supp_ind = which(C[i,] != 0)
     Si_l0 = length(supp_ind)
     if (Si_l0 > 0) {
-      C[i,supp_ind] = crossprod(ginv(G[supp_ind, supp_ind]), g[supp_ind,i])
+      C[i,supp_ind] = crossprod(ginv(G[supp_ind, supp_ind, drop = F], tol = 1e-6),
+                                g[supp_ind,i])
     }
   }
   return(C)
@@ -160,15 +162,14 @@ mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL, C_init = NUL
         C_temp[i,] = fista_lasso(G, g[,i], C_init[i,], lambda0,
                                  rep(1, p), weak, max_iter = max_iter,
                                  tolerance = tolerance)
-        if (!is.null(pb)) {pb()}
       }
     } else {
       for (i in 1:p) {
         C_temp[i,] = wlasso_gram(G, g[,i], lambda0, C_init[i,], weak, max_iter = max_iter,
                                  tolerance = tolerance)
-        if (!is.null(pb)) {pb()}
       }
     }
+    if (!is.null(pb)) {pb()}
   } else {
     C_temp = group_lasso_gram(G, g, Grp, lambda0, C_init,
                               max_iter = max_iter, tolerance = tolerance)
