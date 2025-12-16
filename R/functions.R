@@ -190,7 +190,7 @@ mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL, C_init = NUL
 #'
 #' @return X The estimated matrix
 #' @importFrom Rdpack reprompt
-#' @importFrom irlba irlba
+#' @importFrom RSpectra eigs_sym
 #' @export
 #'
 #' @examples
@@ -216,9 +216,9 @@ mat_nuclear <- function(G, g, lambda, X0 = NULL, max_iter = 1000,
     X0 <- matrix(0, p, ncol(g))
   }
 
-  # Compute step size using irlba
+  # Compute step size using Rspectra
   eta <- tryCatch({
-    1 / irlba(G, 1, 1)$d[1]
+    1 / eigs_sym(G, k = 1, which = "LM")$values[1]
   }, warning = function(w) {
     1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
   }, error = function(e) {
@@ -244,16 +244,24 @@ mat_nuclear <- function(G, g, lambda, X0 = NULL, max_iter = 1000,
     # SVT
     svd_result <- svd(Y)
     s_thresh <- pmax(svd_result$d - eta * lambda, 0)
-    X_curr <- svd_result$u %*% diag(s_thresh, nrow = length(s_thresh)) %*% t(svd_result$v)
+    X_curr <- svd_result$u %*% (s_thresh * t(svd_result$v))
 
     # FISTA momentum
-    t_curr <- (1 + sqrt(1 + 4 * t_prev^2)) / 2
-    beta <- (t_prev - 1) / t_curr
-    Z <- X_curr + beta * (X_curr - X_prev)
+    if (sum((Z - X_curr) * (X_curr - X_prev)) > 0) {
+      # Restart
+      Z <- X_curr
+      t_curr <- 1
+    } else {
+      # Continue with momentum
+      # FISTA momentum
+      t_curr <- (1 + sqrt(1 + 4 * t_prev^2)) / 2
+      beta <- (t_prev - 1) / t_curr
+      Z <- X_curr + beta * (X_curr - X_prev)
+    }
 
     # Convergence check
-    norm_diff <- norm(X_curr - X_prev, "F")
-    norm_prev <- norm(X_prev, "F")
+    norm_diff <- sqrt(sum((X_curr - X_prev)^2))
+    norm_prev <- sqrt(sum(X_prev^2))
 
     if (ifelse(norm_prev < 1e-10, norm_diff < tolerance, norm_diff / norm_prev < tolerance)) {
       if (verbose) cat(sprintf("Converged in %d iterations\n", iter))
