@@ -22,7 +22,7 @@ soft_threshold <- function(z, lambda_j, weak = FALSE) {
 #' @param tolerance The convergence tolerance
 #'
 #' @returns beta The estimated coefficients
-#' @importFrom irlba irlba
+#' @importFrom RSpectra eigs_sym
 #' @importFrom Rdpack reprompt
 #' @export
 #'
@@ -54,10 +54,11 @@ fista_lasso <- function(gram_matrix, xy, beta_init, lambda, penalty_factors,
 
   # Compute Lipschitz constant (largest eigenvalue of Gram matrix)
   step_size <- tryCatch({
-    1 / irlba(gram_matrix, 1, 1)$d[1]
+    1 / eigs_sym(gram_matrix, k = 1, which = "LM")$values[1]
+  }, warning = function(w) {
+    1 / max(eigen(gram_matrix, symmetric = TRUE, only.values = TRUE)$values)
   }, error = function(e) {
-    eig_max <- max(eigen(gram_matrix, symmetric = TRUE, only.values = TRUE)$values)
-    1 / eig_max
+    1 / max(eigen(gram_matrix, symmetric = TRUE, only.values = TRUE)$values)
   })
 
   for (iter in 1:max_iter) {

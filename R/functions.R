@@ -63,7 +63,7 @@ wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, max_iter = 1000,
 #' @import Rcpp
 #' @import RcppArmadillo
 #' @importFrom Rdpack reprompt
-#' @importFrom irlba irlba
+#' @importFrom RSpectra eigs_sym
 #' @importFrom MASS ginv
 #' @export
 #'
@@ -90,13 +90,15 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL,
   sorted_unique_vals <- sort(unique_vals)
   factor_indices <- match(Grp, sorted_unique_vals)
   Grp <- matrix(factor_indices, nrow = p)
+
   eta <- tryCatch({
-    # Try irlba first (fast)
-    1 / irlba(G, 1, 1, maxit = 2000)$d[1]
+    1 / eigs_sym(G, k = 1, which = "LM")$values[1]
+  }, warning = function(w) {
+    1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
   }, error = function(e) {
-    # Fall back to full SVD if irlba fails
     1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
   })
+
   if (is.infinite(eta)) {return(matrix(0, p, p))}
   if (is.null(beta0)) {beta0 = matrix(0, p, p)}
   C = group_lasso_cpp(G, g, Grp, lambda, beta0, eta,

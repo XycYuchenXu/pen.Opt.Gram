@@ -9,7 +9,7 @@ License: GPL-2
 Encoding: UTF-8
 LazyData: true
 Depends: R (>= 4.0.0), Rdpack
-Imports: MASS, irlba, Rcpp, RcppArmadillo, RSpectra
+Imports: MASS, Rcpp, RcppArmadillo, RSpectra
 LinkingTo: Rcpp, RcppArmadillo
 RdMacros: Rdpack
 RoxygenNote: 7.3.2
