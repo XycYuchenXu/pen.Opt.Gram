@@ -219,9 +219,10 @@ mat_nuclear <- function(G, g, lambda, X0 = NULL, max_iter = 1000,
   # Compute step size using irlba
   eta <- tryCatch({
     1 / irlba(G, 1, 1)$d[1]
+  }, warning = function(w) {
+    1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
   }, error = function(e) {
-    eig_max <- max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
-    1 / eig_max
+    1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
   })
   if (is.infinite(eta)) {
     return(matrix(0, p, ncol(g)))
