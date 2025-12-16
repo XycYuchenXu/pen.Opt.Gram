@@ -223,6 +223,9 @@ mat_nuclear <- function(G, g, lambda, X0 = NULL, max_iter = 1000,
     eig_max <- max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
     1 / eig_max
   })
+  if (is.infinite(eta)) {
+    return(matrix(0, p, ncol(g)))
+  }
 
   X_curr <- X0
   X_prev <- X0
