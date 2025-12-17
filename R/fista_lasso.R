@@ -1,5 +1,5 @@
 #' @keywords internal
-soft_threshold <- function(z, lambda_j, weak = FALSE) {
+soft_threshold_lasso <- function(z, lambda_j, weak = FALSE) {
   if (weak) {
     # Weak sparsity: use half threshold for values in [-lambda, lambda]
     ifelse(z > lambda_j, z - lambda_j,
@@ -68,7 +68,7 @@ fista_lasso <- function(gram_matrix, xy, beta_init, lambda, penalty_factors,
 
     # Proximal step (soft-thresholding)
     scaled_penalties <- lambda * penalty_factors * step_size
-    beta_new <- soft_threshold(z, scaled_penalties, weak)
+    beta_new <- soft_threshold_lasso(z, scaled_penalties, weak)
 
     # Check convergence
     max_change <- max(abs(beta_new - beta))

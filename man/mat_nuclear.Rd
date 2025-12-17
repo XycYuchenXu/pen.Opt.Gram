@@ -9,6 +9,8 @@ mat_nuclear(
   g,
   lambda,
   X0 = NULL,
+  method = c("fista", "admm"),
+  rho = NULL,
   max_iter = 1000,
   tolerance = 1e-06,
   verbose = FALSE
@@ -22,6 +24,10 @@ mat_nuclear(
 \item{lambda}{The regularization parameter}
 
 \item{X0}{The initial value of X}
+
+\item{method}{The method to use: "fista" or "admm"}
+
+\item{rho}{The ADMM penalty parameter (if method is "admm")}
 
 \item{max_iter}{The maximum number of iterations}
 

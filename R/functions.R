@@ -180,12 +180,26 @@ mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL, C_init = NUL
   return(C_temp)
 }
 
+#' @keywords internal
+soft_threshold_nuclear <- function(M, thresh) {
+  s <- svd(M)
+  d_new <- pmax(s$d - thresh, 0)
+
+  if (d_new[1] == 0) return(matrix(0, nrow(M), ncol(M)))
+
+  # Optimization: Broadcast vector multiply instead of diag matrix
+  pos <- d_new > 0
+  s$u[, pos, drop=FALSE] %*% (d_new[pos] * t(s$v[, pos, drop=FALSE]))
+}
+
 #' Solve the matrix with nuclear norm penalty
 #'
 #' @param G The Gram matrix X'X / n
 #' @param g The matrix X'y / n
 #' @param lambda The regularization parameter
 #' @param X0 The initial value of X
+#' @param method The method to use: "fista" or "admm"
+#' @param rho The ADMM penalty parameter (if method is "admm")
 #' @param max_iter The maximum number of iterations
 #' @param tolerance The convergence tolerance
 #' @param verbose Whether to print convergence information
@@ -209,8 +223,8 @@ mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL, C_init = NUL
 #' lambda <- 0.1
 #' # Estimate matrix with nuclear norm penalty
 #' X_est <- mat_nuclear(G, g, lambda)
-mat_nuclear <- function(G, g, lambda, X0 = NULL, max_iter = 1000,
-                        tolerance = 1e-6, verbose = FALSE) {
+mat_nuclear <- function(G, g, lambda, X0 = NULL, method = c("fista", "admm"), rho = NULL,
+                        max_iter = 1000, tolerance = 1e-6, verbose = FALSE) {
   p <- nrow(G)
 
   # Initialize X0
@@ -218,47 +232,71 @@ mat_nuclear <- function(G, g, lambda, X0 = NULL, max_iter = 1000,
     X0 <- matrix(0, p, ncol(g))
   }
 
-  # Compute step size using Rspectra
-  eta <- tryCatch({
-    1 / eigs_sym(G, k = 1, which = "LM")$values[1]
-  }, warning = function(w) {
-    1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
-  }, error = function(e) {
-    1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
-  })
-  if (is.infinite(eta)) {
-    return(matrix(0, p, ncol(g)))
-  }
-
-  X_curr <- X0
   X_prev <- X0
 
-  # FISTA
-  Z <- X0
-  t_curr <- 1
-  t_prev <- 1
+  method <- match.arg(method)
+
+  # --- ALGORITHM-SPECIFIC SETUP ---
+  if (method == "admm") {
+    # ADMM: Pre-compute Cholesky for linear solve
+    if (is.null(rho)) { rho <- sum(diag(G)) / p }
+    M_chol <- tryCatch(chol(G + diag(rho, p)), error = function(e) NULL)
+    Z <- matrix(0, p, ncol(g)); U <- matrix(0, p, ncol(g))
+  } else if (method == "fista") {
+    # Compute step size using Rspectra
+    eta <- tryCatch({
+      1 / eigs_sym(G, k = 1, which = "LM")$values[1]
+    }, warning = function(w) {
+      1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
+    }, error = function(e) {
+      1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
+    })
+    if (is.infinite(eta)) {
+      return(matrix(0, p, ncol(g)))
+    }
+
+    # FISTA
+    Z <- X0
+    t_curr <- 1
+    t_prev <- 1
+  }
 
   for (iter in 1:max_iter) {
-    # Gradient step
-    Grad <- tcrossprod(Z, G) - t(g)
-    Y <- Z - eta * Grad
+    if (method == "admm") {
+      # ================= ADMM UPDATE =================
+      # 1. Ridge Step: B(G + rho*I) = g' + rho(Z - U)
+      RHS <- t(g) + rho * (Z - U)
 
-    # SVT
-    svd_result <- svd(Y)
-    s_thresh <- pmax(svd_result$d - eta * lambda, 0)
-    X_curr <- svd_result$u %*% (s_thresh * t(svd_result$v))
+      # Solve M * B' = RHS' (Using pre-computed Cholesky if possible)
+      X_t <- if (!is.null(M_chol)) backsolve(M_chol, forwardsolve(t(M_chol), t(RHS))) else solve(G + diag(rho, p), t(RHS))
+      X_curr <- t(X_t)
 
-    # FISTA momentum
-    if (sum((Z - X_curr) * (X_curr - X_prev)) > 0) {
-      # Restart
-      Z <- X_curr
-      t_curr <- 1
+      # 2. SVT Step: Z = SVT(B + U)
+      Z <- soft_threshold_nuclear(X_curr + U, lambda / rho)
+
+      # 3. Dual Step
+      U <- U + (X_curr - Z)
     } else {
-      # Continue with momentum
+      # ================= FISTA UPDATE =================
+      # Gradient step
+      Grad <- tcrossprod(Z, G) - t(g)
+
+      # SVT
+      X_curr <- soft_threshold_nuclear(Z - eta * Grad, eta * lambda)
+
       # FISTA momentum
-      t_curr <- (1 + sqrt(1 + 4 * t_prev^2)) / 2
-      beta <- (t_prev - 1) / t_curr
-      Z <- X_curr + beta * (X_curr - X_prev)
+      if (sum((Z - X_curr) * (X_curr - X_prev)) < 0) {
+        # Restart
+        Z <- X_curr
+        t_curr <- 1
+      } else {
+        # Continue with momentum
+        # FISTA momentum
+        t_curr <- (1 + sqrt(1 + 4 * t_prev^2)) / 2
+        Z <- X_curr + (t_prev - 1) / t_curr * (X_curr - X_prev)
+      }
+
+      t_prev <- t_curr
     }
 
     # Convergence check
@@ -271,7 +309,6 @@ mat_nuclear <- function(G, g, lambda, X0 = NULL, max_iter = 1000,
     }
 
     X_prev <- X_curr
-    t_prev <- t_curr
   }
 
   return(X_curr)
