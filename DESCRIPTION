@@ -12,6 +12,6 @@ Depends: R (>= 4.0.0), Rdpack
 Imports: MASS, Rcpp, RcppArmadillo, RSpectra
 LinkingTo: Rcpp, RcppArmadillo
 RdMacros: Rdpack
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Suggests: knitr, rmarkdown, devtools
 VignetteBuilder: knitr

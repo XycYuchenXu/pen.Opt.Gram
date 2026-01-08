@@ -13,6 +13,7 @@ mat_lasso(
   Grp = NULL,
   C_init = NULL,
   method = c("fista", "rcpp"),
+  refine = T,
   max_iter = 200,
   tolerance = 1e-04,
   pb = NULL
@@ -34,6 +35,8 @@ mat_lasso(
 \item{C_init}{The initial value of C}
 
 \item{method}{The method to use: "fista" or "rcpp"}
+
+\item{refine}{Whether to perform debiasing on the support}
 
 \item{max_iter}{The maximum number of iterations}
 

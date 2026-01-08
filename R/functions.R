@@ -5,6 +5,7 @@
 #' @param lambda The regularization parameter
 #' @param beta0 The initial value of beta
 #' @param weak True for weak Lasso, False for standard Lasso
+#' @param refine Whether to perform debiasing on the support
 #' @param max_iter The maximum number of iterations
 #' @param tolerance The convergence tolerance
 #'
@@ -29,15 +30,15 @@
 #' lambda <- 0.1
 #' # Estimate coefficients with weak Lasso penalty
 #' beta_est <- wlasso_gram(G, g, lambda, weak = TRUE)
-wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, max_iter = 1000,
-                       tolerance = 1e-6){
+wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, refine = T,
+                       max_iter = 1000, tolerance = 1e-6){
   if (is.null(beta0)) {
     p = nrow(G)
     beta0 = rep(0, p)
   }
   beta_est = lasso_row_cpp(G, g, lambda, beta0, weak, max_iter, tolerance)
 
-  if (!weak) {
+  if (!weak && refine) {
     # Debiasing step
     supp_ind = which(beta_est != 0)
     Si_l0 = length(supp_ind)
@@ -56,6 +57,7 @@ wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, max_iter = 1000,
 #' @param Grp The group assignment matrix, indexes starting from 1
 #' @param lambda The regularization parameter
 #' @param beta0 The initial value of beta
+#' @param refine Whether to perform debiasing on the support
 #' @param max_iter The maximum number of iterations
 #' @param tolerance The convergence tolerance
 #'
@@ -83,7 +85,7 @@ wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, max_iter = 1000,
 #' lambda <- 0.1
 #' # Estimate matrix with group Lasso penalty
 #' C_est <- group_lasso_gram(G, g, Grp, lambda)
-group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL,
+group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL, refine = T,
                             max_iter = 1000, tolerance = 1e-6){
   p = nrow(Grp)
   unique_vals <- unique(as.vector(Grp))
@@ -104,14 +106,17 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL,
   C = group_lasso_cpp(G, g, Grp, lambda, beta0, eta,
                       max_iter = max_iter, tolerance = tolerance)
 
-  for (i in 1:p) {
-    supp_ind = which(C[i,] != 0)
-    Si_l0 = length(supp_ind)
-    if (Si_l0 > 0) {
-      C[i,supp_ind] = crossprod(ginv(G[supp_ind, supp_ind, drop = F], tol = 1e-6),
-                                g[supp_ind,i])
+  if (refine) {
+    for (i in 1:p) {
+      supp_ind = which(C[i,] != 0)
+      Si_l0 = length(supp_ind)
+      if (Si_l0 > 0) {
+        C[i,supp_ind] = crossprod(ginv(G[supp_ind, supp_ind, drop = F], tol = 1e-6),
+                                  g[supp_ind,i])
+      }
     }
   }
+
   return(C)
 }
 
@@ -125,6 +130,7 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL,
 #' @param Grp The group assignment matrix, indexes starting from 1
 #' @param C_init The initial value of C
 #' @param method The method to use: "fista" or "rcpp"
+#' @param refine Whether to perform debiasing on the support
 #' @param max_iter The maximum number of iterations
 #' @param tolerance The convergence tolerance
 #' @param pb A progress bar function
@@ -150,8 +156,8 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL,
 #' # Estimate matrix with Lasso penalty
 #' C_est <- mat_lasso(G, g, lambda, alpha = 1, weak = FALSE)
 mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL, C_init = NULL,
-                     method = c("fista", "rcpp"), max_iter = 200, tolerance = 1e-4,
-                     pb = NULL){
+                     method = c("fista", "rcpp"), refine = T,
+                     max_iter = 200, tolerance = 1e-4, pb = NULL){
   p = nrow(G)
   C_temp = matrix(0, p, p)
   lambda0 = lambda * alpha
@@ -162,18 +168,18 @@ mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL, C_init = NUL
     if (method == "fista") {
       for (i in 1:p) {
         C_temp[i,] = fista_lasso(G, g[,i], C_init[i,], lambda0,
-                                 rep(1, p), weak, max_iter = max_iter,
+                                 rep(1, p), weak, refine, max_iter = max_iter,
                                  tolerance = tolerance)
       }
     } else {
       for (i in 1:p) {
-        C_temp[i,] = wlasso_gram(G, g[,i], lambda0, C_init[i,], weak, max_iter = max_iter,
+        C_temp[i,] = wlasso_gram(G, g[,i], lambda0, C_init[i,], weak, refine, max_iter = max_iter,
                                  tolerance = tolerance)
       }
     }
     if (!is.null(pb)) {pb()}
   } else {
-    C_temp = group_lasso_gram(G, g, Grp, lambda0, C_init,
+    C_temp = group_lasso_gram(G, g, Grp, lambda0, C_init, refine,
                               max_iter = max_iter, tolerance = tolerance)
   }
 

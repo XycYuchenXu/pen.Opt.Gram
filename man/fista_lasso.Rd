@@ -11,6 +11,7 @@ fista_lasso(
   lambda,
   penalty_factors,
   weak = FALSE,
+  refine = T,
   max_iter = 1000,
   tolerance = 1e-06
 )
@@ -27,6 +28,8 @@ fista_lasso(
 \item{penalty_factors}{The penalty factors for each coefficient}
 
 \item{weak}{Logical, whether to use weak sparsity}
+
+\item{refine}{Whether to perform debiasing on the support}
 
 \item{max_iter}{The maximum number of iterations}
 

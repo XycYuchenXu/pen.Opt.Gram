@@ -10,6 +10,7 @@ group_lasso_gram(
   Grp,
   lambda,
   beta0 = NULL,
+  refine = T,
   max_iter = 1000,
   tolerance = 1e-06
 )
@@ -24,6 +25,8 @@ group_lasso_gram(
 \item{lambda}{The regularization parameter}
 
 \item{beta0}{The initial value of beta}
+
+\item{refine}{Whether to perform debiasing on the support}
 
 \item{max_iter}{The maximum number of iterations}
 

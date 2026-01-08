@@ -18,6 +18,7 @@ soft_threshold_lasso <- function(z, lambda_j, weak = FALSE) {
 #' @param lambda The regularization parameter
 #' @param penalty_factors The penalty factors for each coefficient
 #' @param weak Logical, whether to use weak sparsity
+#' @param refine Whether to perform debiasing on the support
 #' @param max_iter The maximum number of iterations
 #' @param tolerance The convergence tolerance
 #'
@@ -44,7 +45,7 @@ soft_threshold_lasso <- function(z, lambda_j, weak = FALSE) {
 #' # Estimate coefficients with FISTA
 #' beta_est <- fista_lasso(G, g, beta_init, lambda, penalty_factors, weak = TRUE)
 fista_lasso <- function(gram_matrix, xy, beta_init, lambda, penalty_factors,
-                        weak = FALSE, max_iter = 1000, tolerance = 1e-6) {
+                        weak = FALSE, refine = T, max_iter = 1000, tolerance = 1e-6) {
 
   p <- length(beta_init)
   beta <- beta_init
@@ -83,6 +84,15 @@ fista_lasso <- function(gram_matrix, xy, beta_init, lambda, penalty_factors,
     # Update for next iteration
     beta <- beta_new
     t <- t_new
+  }
+
+  if (!weak && refine) {
+    supp_ind = which(beta != 0)
+    Si_l0 = length(supp_ind)
+    if (Si_l0 > 0) {
+      beta[supp_ind] = crossprod(ginv(gram_matrix[supp_ind, supp_ind, drop = F], tol = 1e-6),
+                                 xy[supp_ind])
+    }
   }
 
   return(as.vector(beta))

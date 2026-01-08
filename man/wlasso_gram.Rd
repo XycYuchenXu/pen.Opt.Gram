@@ -10,6 +10,7 @@ wlasso_gram(
   lambda,
   beta0 = NULL,
   weak = T,
+  refine = T,
   max_iter = 1000,
   tolerance = 1e-06
 )
@@ -24,6 +25,8 @@ wlasso_gram(
 \item{beta0}{The initial value of beta}
 
 \item{weak}{True for weak Lasso, False for standard Lasso}
+
+\item{refine}{Whether to perform debiasing on the support}
 
 \item{max_iter}{The maximum number of iterations}
 
