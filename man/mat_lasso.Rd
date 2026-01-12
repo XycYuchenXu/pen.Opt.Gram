@@ -20,9 +20,9 @@ mat_lasso(
 )
 }
 \arguments{
-\item{G}{The Gram matrix X'X / n}
+\item{G}{The Gram matrix X'X / n, of size p x p}
 
-\item{g}{The matrix X'y / n}
+\item{g}{The matrix X'y / n, of size p x q}
 
 \item{lambda}{The regularization parameter}
 
@@ -48,7 +48,13 @@ mat_lasso(
 C The estimated coefficients matrix
 }
 \description{
-Solve the matrix, wrapper.
+Solve the coefficient C for the regularized problem with model Y = X C' + E,
+Y of size n x q, X of size n x p, C of size q x p.
+}
+\details{
+The objective function is f(C) = 0.5 * trace(C G C') - trace(C g) + lambda * P(C),
+where P(C) is the penalty function (Lasso, weak Lasso, or
+group Lasso).
 }
 \examples{
 # Generate random data

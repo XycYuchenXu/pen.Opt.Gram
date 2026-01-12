@@ -122,8 +122,15 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL, refine = T,
 
 #' Solve the matrix, wrapper.
 #'
-#' @param G The Gram matrix X'X / n
-#' @param g The matrix X'y / n
+#' Solve the coefficient C for the regularized problem with model Y = X C' + E,
+#' Y of size n x q, X of size n x p, C of size q x p.
+#'
+#' The objective function is f(C) = 0.5 * trace(C G C') - trace(C g) + lambda * P(C),
+#' where P(C) is the penalty function (Lasso, weak Lasso, or
+#' group Lasso).
+#'
+#' @param G The Gram matrix X'X / n, of size p x p
+#' @param g The matrix X'y / n, of size p x q
 #' @param lambda The regularization parameter
 #' @param alpha The update weight
 #' @param weak True for weak Lasso, False for standard Lasso
@@ -158,21 +165,21 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL, refine = T,
 mat_lasso = function(G, g, lambda, alpha = 1, weak = F, Grp = NULL, C_init = NULL,
                      method = c("fista", "rcpp"), refine = T,
                      max_iter = 200, tolerance = 1e-4, pb = NULL){
-  p = nrow(G)
-  C_temp = matrix(0, p, p)
+  p = nrow(G); q = ncol(g)
+  C_temp = matrix(0, q, p)
   lambda0 = lambda * alpha
   if (is.null(C_init)) {C_init = C_temp}
 
   method <- match.arg(method)
   if (is.null(Grp)) {
     if (method == "fista") {
-      for (i in 1:p) {
+      for (i in 1:q) {
         C_temp[i,] = fista_lasso(G, g[,i], C_init[i,], lambda0,
                                  rep(1, p), weak, refine, max_iter = max_iter,
                                  tolerance = tolerance)
       }
     } else {
-      for (i in 1:p) {
+      for (i in 1:q) {
         C_temp[i,] = wlasso_gram(G, g[,i], lambda0, C_init[i,], weak, refine, max_iter = max_iter,
                                  tolerance = tolerance)
       }
@@ -198,19 +205,26 @@ soft_threshold_nuclear <- function(M, thresh) {
   s$u[, pos, drop=FALSE] %*% (d_new[pos] * t(s$v[, pos, drop=FALSE]))
 }
 
-#' Solve the matrix with nuclear norm penalty
+#' Solve the matrix with nuclear norm penalty.
 #'
-#' @param G The Gram matrix X'X / n
-#' @param g The matrix X'y / n
+#' Solve the coefficient B for the regularized problem with model Y = X B' + E,
+#' Y of size n x q, X of size n x p, B of size q x p.
+#'
+#' The objective function is f(B) = 0.5 * trace(B G B') - trace(B g) + lambda * ||B||_*,
+#' where ||B||_* is the nuclear norm of B.
+#'
+#' @param G The Gram matrix X'X / n, of size p x p
+#' @param g The matrix X'y / n, of size p x q
 #' @param lambda The regularization parameter
-#' @param X0 The initial value of X
+#' @param B0 The initial value of B
 #' @param method The method to use: "fista" or "admm"
 #' @param rho The ADMM penalty parameter (if method is "admm")
+#' @param refine Whether to perform debiasing on the support
 #' @param max_iter The maximum number of iterations
 #' @param tolerance The convergence tolerance
 #' @param verbose Whether to print convergence information
 #'
-#' @return X The estimated matrix
+#' @return B The estimated matrix
 #' @importFrom Rdpack reprompt
 #' @importFrom RSpectra eigs_sym
 #' @export
@@ -228,17 +242,17 @@ soft_threshold_nuclear <- function(M, thresh) {
 #' # Set regularization parameter
 #' lambda <- 0.1
 #' # Estimate matrix with nuclear norm penalty
-#' X_est <- mat_nuclear(G, g, lambda)
-mat_nuclear <- function(G, g, lambda, X0 = NULL, method = c("fista", "admm"), rho = NULL,
-                        max_iter = 1000, tolerance = 1e-6, verbose = FALSE) {
-  p <- nrow(G)
+#' B_est <- mat_nuclear(G, g, lambda)
+mat_nuclear <- function(G, g, lambda, B0 = NULL, method = c("fista", "admm"), rho = NULL,
+                        refine = T, max_iter = 1000, tolerance = 1e-6, verbose = FALSE) {
 
+  p <- nrow(G); q = ncol(g)
   # Initialize X0
-  if (is.null(X0)) {
-    X0 <- matrix(0, p, ncol(g))
+  if (is.null(B0)) {
+    B0 <- matrix(0, q, p)
   }
 
-  X_prev <- X0
+  B_prev <- B0
 
   method <- match.arg(method)
 
@@ -247,7 +261,7 @@ mat_nuclear <- function(G, g, lambda, X0 = NULL, method = c("fista", "admm"), rh
     # ADMM: Pre-compute Cholesky for linear solve
     if (is.null(rho)) { rho <- sum(diag(G)) / p }
     M_chol <- tryCatch(chol(G + diag(rho, p)), error = function(e) NULL)
-    Z <- matrix(0, p, ncol(g)); U <- matrix(0, p, ncol(g))
+    Z <- matrix(0, q, p); U <- matrix(0, q, p)
   } else if (method == "fista") {
     # Compute step size using Rspectra
     eta <- tryCatch({
@@ -258,11 +272,11 @@ mat_nuclear <- function(G, g, lambda, X0 = NULL, method = c("fista", "admm"), rh
       1 / max(eigen(G, symmetric = TRUE, only.values = TRUE)$values)
     })
     if (is.infinite(eta)) {
-      return(matrix(0, p, ncol(g)))
+      return(matrix(0, q, p))
     }
 
     # FISTA
-    Z <- X0
+    Z <- B0
     t_curr <- 1
     t_prev <- 1
   }
@@ -274,48 +288,86 @@ mat_nuclear <- function(G, g, lambda, X0 = NULL, method = c("fista", "admm"), rh
       RHS <- t(g) + rho * (Z - U)
 
       # Solve M * B' = RHS' (Using pre-computed Cholesky if possible)
-      X_t <- if (!is.null(M_chol)) backsolve(M_chol, forwardsolve(t(M_chol), t(RHS))) else solve(G + diag(rho, p), t(RHS))
-      X_curr <- t(X_t)
+      B_t <- if (!is.null(M_chol)) backsolve(M_chol, forwardsolve(t(M_chol), t(RHS))) else solve(G + diag(rho, p), t(RHS))
+      B_curr <- t(B_t)
 
       # 2. SVT Step: Z = SVT(B + U)
-      Z <- soft_threshold_nuclear(X_curr + U, lambda / rho)
+      Z <- soft_threshold_nuclear(B_curr + U, lambda / rho)
 
       # 3. Dual Step
-      U <- U + (X_curr - Z)
+      U <- U + (B_curr - Z)
     } else {
       # ================= FISTA UPDATE =================
       # Gradient step
       Grad <- tcrossprod(Z, G) - t(g)
 
       # SVT
-      X_curr <- soft_threshold_nuclear(Z - eta * Grad, eta * lambda)
+      B_curr <- soft_threshold_nuclear(Z - eta * Grad, eta * lambda)
 
       # FISTA momentum
-      if (sum((Z - X_curr) * (X_curr - X_prev)) < 0) {
+      if (sum((Z - B_curr) * (B_curr - B_prev)) < 0) {
         # Restart
-        Z <- X_curr
+        Z <- B_curr
         t_curr <- 1
       } else {
         # Continue with momentum
         # FISTA momentum
         t_curr <- (1 + sqrt(1 + 4 * t_prev^2)) / 2
-        Z <- X_curr + (t_prev - 1) / t_curr * (X_curr - X_prev)
+        Z <- B_curr + (t_prev - 1) / t_curr * (B_curr - B_prev)
       }
 
       t_prev <- t_curr
     }
 
     # Convergence check
-    norm_diff <- sqrt(sum((X_curr - X_prev)^2))
-    norm_prev <- sqrt(sum(X_prev^2))
+    norm_diff <- sqrt(sum((B_curr - B_prev)^2))
+    norm_prev <- sqrt(sum(B_prev^2))
 
     if (ifelse(norm_prev < 1e-10, norm_diff < tolerance, norm_diff / norm_prev < tolerance)) {
       if (verbose) cat(sprintf("Converged in %d iterations\n", iter))
       break
     }
 
-    X_prev <- X_curr
+    B_prev <- B_curr
   }
 
-  return(X_curr)
+  # --- DEBIASING / REFITTING STEP (DIAGONAL S) ---
+  if (refine) {
+    # 1. Extract Support via SVD
+    svd_B <- svd(B_curr)
+    r <- length(svd_B$d > 1e-8)
+
+    if (r > 0) {
+      U_r <- svd_B$u[, 1:r, drop = FALSE] # q x r
+      V_r <- svd_B$v[, 1:r, drop = FALSE] # p x r
+
+      # 2. Compute numerators and denominators efficiently
+      # Numerator: diag(V_r' * g * U_r) -> colSums(V_r * (g %*% U_r))
+      # Denominator: diag(V_r' * G * V_r) -> colSums(V_r * (G %*% V_r))
+
+      # g is p x q, U_r is q x r -> gU is p x r
+      gV = crossprod(g, V_r)
+      num = colSums(U_r * gV)
+
+      # G is p x p, V_r is p x r -> GV is p x r
+      GV <- crossprod(G, V_r)
+      den <- colSums(V_r * GV)
+
+      # 3. Solve for new singular values (element-wise division)
+      # Handle potential division by zero if variance in that direction is 0
+      s_new <- numeric(r)
+      valid_idx <- abs(den) > 1e-10
+      s_new[valid_idx] <- num[valid_idx] / den[valid_idx]
+
+      # 4. Reconstruct B with new singular values
+      # B = U * diag(s_new) * V'
+      # Efficient multiplication: scale columns of U then multiply by V'
+      B_curr = crossprod(t(U_r), s_new * t(V_r))
+
+    } else {
+      B_curr <- matrix(0, nrow(B_curr), ncol(B_curr))
+    }
+  }
+
+  return(B_curr)
 }

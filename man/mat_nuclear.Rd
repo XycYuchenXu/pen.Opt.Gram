@@ -2,32 +2,35 @@
 % Please edit documentation in R/functions.R
 \name{mat_nuclear}
 \alias{mat_nuclear}
-\title{Solve the matrix with nuclear norm penalty}
+\title{Solve the matrix with nuclear norm penalty.}
 \usage{
 mat_nuclear(
   G,
   g,
   lambda,
-  X0 = NULL,
+  B0 = NULL,
   method = c("fista", "admm"),
   rho = NULL,
+  refine = T,
   max_iter = 1000,
   tolerance = 1e-06,
   verbose = FALSE
 )
 }
 \arguments{
-\item{G}{The Gram matrix X'X / n}
+\item{G}{The Gram matrix X'X / n, of size p x p}
 
-\item{g}{The matrix X'y / n}
+\item{g}{The matrix X'y / n, of size p x q}
 
 \item{lambda}{The regularization parameter}
 
-\item{X0}{The initial value of X}
+\item{B0}{The initial value of B}
 
 \item{method}{The method to use: "fista" or "admm"}
 
 \item{rho}{The ADMM penalty parameter (if method is "admm")}
+
+\item{refine}{Whether to perform debiasing on the support}
 
 \item{max_iter}{The maximum number of iterations}
 
@@ -36,10 +39,15 @@ mat_nuclear(
 \item{verbose}{Whether to print convergence information}
 }
 \value{
-X The estimated matrix
+B The estimated matrix
 }
 \description{
-Solve the matrix with nuclear norm penalty
+Solve the coefficient B for the regularized problem with model Y = X B' + E,
+Y of size n x q, X of size n x p, B of size q x p.
+}
+\details{
+The objective function is f(B) = 0.5 * trace(B G B') - trace(B g) + lambda * ||B||_*,
+where ||B||_* is the nuclear norm of B.
 }
 \examples{
 # Generate random data
@@ -54,5 +62,5 @@ g <- crossprod(X, Y) / n
 # Set regularization parameter
 lambda <- 0.1
 # Estimate matrix with nuclear norm penalty
-X_est <- mat_nuclear(G, g, lambda)
+B_est <- mat_nuclear(G, g, lambda)
 }
