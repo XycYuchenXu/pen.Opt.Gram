@@ -12,7 +12,6 @@
 #' @return beta The estimated coefficients
 #' @import Rcpp
 #' @import RcppArmadillo
-#' @importFrom MASS ginv
 #' @importFrom Rdpack reprompt
 #' @export
 #'
@@ -43,7 +42,7 @@ wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, refine = T,
     supp_ind = which(beta_est != 0)
     Si_l0 = length(supp_ind)
     if (Si_l0 > 0) {
-      beta_est[supp_ind] = crossprod(ginv(G[supp_ind, supp_ind, drop = F], tol = 1e-6),
+      beta_est[supp_ind] = crossprod(ginv_robust(G[supp_ind, supp_ind, drop = F], tol = 1e-6),
                                      g[supp_ind])
     }
   }
@@ -66,7 +65,6 @@ wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, refine = T,
 #' @import RcppArmadillo
 #' @importFrom Rdpack reprompt
 #' @importFrom RSpectra eigs_sym
-#' @importFrom MASS ginv
 #' @export
 #'
 #' @examples
@@ -111,7 +109,7 @@ group_lasso_gram = function(G, g, Grp, lambda, beta0 = NULL, refine = T,
       supp_ind = which(C[i,] != 0)
       Si_l0 = length(supp_ind)
       if (Si_l0 > 0) {
-        C[i,supp_ind] = crossprod(ginv(G[supp_ind, supp_ind, drop = F], tol = 1e-6),
+        C[i,supp_ind] = crossprod(ginv_robust(G[supp_ind, supp_ind, drop = F], tol = 1e-6),
                                   g[supp_ind,i])
       }
     }
@@ -203,6 +201,38 @@ soft_threshold_nuclear <- function(M, thresh) {
   # Optimization: Broadcast vector multiply instead of diag matrix
   pos <- d_new > 0
   s$u[, pos, drop=FALSE] %*% (d_new[pos] * t(s$v[, pos, drop=FALSE]))
+}
+
+#' @keywords internal
+#' @importFrom MASS ginv
+ginv_robust <- function(X, tol = 1e-6) {
+  tryCatch({
+    return(ginv(X, tol = tol))
+  }, error = function(e) {
+    X <- as.matrix(X)
+    n <- nrow(X)
+    p <- ncol(X)
+
+    if (n >= p) {
+      S <- eigen(crossprod(X), symmetric = TRUE)
+      pos <- S$values > max(tol * S$values[1], 0)
+      if (!any(pos)) return(matrix(0, p, n))
+
+      inv_vals <- 1 / S$values[pos]
+      U = S$vectors[, pos, drop=FALSE]
+      return(U %*% (inv_vals * t(U)) %*% t(X))
+    } else {
+      # Wide matrix: Decompose XX'
+      S <- eigen(tcrossprod(X), symmetric = TRUE)
+      pos <- S$values > max(tol * S$values[1], 0)
+      if (!any(pos)) return(matrix(0, p, n))
+
+      # X^+ = X^T * U * Sigma^-2 * U^T
+      inv_vals <- 1 / S$values[pos]
+      U = S$vectors[, pos, drop=FALSE]
+      return(t(X) %*% U %*% (inv_vals * t(U)))
+    }
+  })
 }
 
 #' Solve the matrix with nuclear norm penalty.
