@@ -12,7 +12,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // group_lasso_cpp
-arma::mat group_lasso_cpp(const arma::mat& xtx, const arma::mat& xty, const arma::mat Grp, double lambda, const arma::mat& X0, double eta, int max_iter, double tolerance);
+arma::mat group_lasso_cpp(const arma::mat& xtx, const arma::mat& xty, const arma::mat Grp, const double lambda, const arma::mat& X0, const double eta, const int max_iter, const double tolerance);
 RcppExport SEXP _pen_Opt_Gram_group_lasso_cpp(SEXP xtxSEXP, SEXP xtySEXP, SEXP GrpSEXP, SEXP lambdaSEXP, SEXP X0SEXP, SEXP etaSEXP, SEXP max_iterSEXP, SEXP toleranceSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -20,11 +20,11 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const arma::mat& >::type xtx(xtxSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type xty(xtySEXP);
     Rcpp::traits::input_parameter< const arma::mat >::type Grp(GrpSEXP);
-    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< const double >::type lambda(lambdaSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type X0(X0SEXP);
-    Rcpp::traits::input_parameter< double >::type eta(etaSEXP);
-    Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
-    Rcpp::traits::input_parameter< double >::type tolerance(toleranceSEXP);
+    Rcpp::traits::input_parameter< const double >::type eta(etaSEXP);
+    Rcpp::traits::input_parameter< const int >::type max_iter(max_iterSEXP);
+    Rcpp::traits::input_parameter< const double >::type tolerance(toleranceSEXP);
     rcpp_result_gen = Rcpp::wrap(group_lasso_cpp(xtx, xty, Grp, lambda, X0, eta, max_iter, tolerance));
     return rcpp_result_gen;
 END_RCPP

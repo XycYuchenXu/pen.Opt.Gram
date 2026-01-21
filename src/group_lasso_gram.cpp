@@ -10,11 +10,11 @@ using namespace arma;
 arma::mat group_lasso_cpp(const arma::mat& xtx,
                           const arma::mat& xty,
                           const arma::mat Grp,
-                          double lambda,
+                          const double lambda,
                           const arma::mat& X0,
-                          double eta,
-                          int max_iter = 1000,
-                          double tolerance = 1e-6) {
+                          const double eta,
+                          const int max_iter = 1000,
+                          const double tolerance = 1e-6) {
 
   int p = Grp.n_rows;
 
@@ -27,7 +27,6 @@ arma::mat group_lasso_cpp(const arma::mat& xtx,
   std::vector<double> weights(n_groups);
   std::vector<int> group_sizes(n_groups);
 
-  int max_group_size = 0;
   for (int g = 0; g < n_groups; g++) {
     double val = unique_vals(g);
     uvec indices = find(grp_vec == val);
@@ -35,7 +34,6 @@ arma::mat group_lasso_cpp(const arma::mat& xtx,
 
     group_sizes[g] = n_elem;
     weights[g] = std::sqrt((double)n_elem);
-    max_group_size = std::max(max_group_size, n_elem);
 
     // Convert linear indices to row, col pairs
     grps[g].reserve(n_elem);
