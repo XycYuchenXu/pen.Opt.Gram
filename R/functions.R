@@ -32,8 +32,8 @@
 #' beta_est <- wlasso_gram(G, g, lambda, weak = TRUE)
 wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, refine = T,
                        max_iter = 1000, tolerance = 1e-6, penalty_factors = NULL){
+  p = nrow(G)
   if (is.null(beta0)) {
-    p = nrow(G)
     beta0 = rep(0, p)
   }
   if (is.null(penalty_factors)) {penalty_factors = rep(1, p)}
