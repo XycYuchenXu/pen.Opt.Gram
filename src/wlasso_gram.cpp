@@ -10,7 +10,7 @@ using namespace arma;
 // [[Rcpp::export]]
 arma::rowvec lasso_row_cpp(const arma::mat& xtx,
                            const arma::vec& xty_i,
-                           double lambda,
+                           const arma::rowvec& lambda,
                            const arma::rowvec& x0,
                            bool weak = false,
                            int max_iter = 1000,
@@ -24,11 +24,12 @@ arma::rowvec lasso_row_cpp(const arma::mat& xtx,
   // Initialize
   rowvec x_curr = x0;
   rowvec x_prev = x_curr;
+  double lambda_j;
 
   // Coordinate descent for this row
   for (int iter = 0; iter < max_iter; iter++) {
     for (int j = 0; j < p; j++) {
-
+      lambda_j = lambda(j);
       // Compute residual: xty_i[j] - xtx[j,:] * x_curr^T (excluding j-th component)
       double r_j = xty_i(j);
       for (int k = 0; k < p; k++) {
@@ -38,13 +39,13 @@ arma::rowvec lasso_row_cpp(const arma::mat& xtx,
 
       // Soft-thresholding operator
       double x_new;
-      if (r_j > lambda) {
-        x_new = (r_j - lambda) / xtx_diag(j);
-      } else if (r_j < -lambda) {
-        x_new = (r_j + lambda) / xtx_diag(j);
+      if (r_j > lambda_j) {
+        x_new = (r_j - lambda_j) / xtx_diag(j);
+      } else if (r_j < -lambda_j) {
+        x_new = (r_j + lambda_j) / xtx_diag(j);
       } else {
         if (weak) {
-          x_new = (r_j > 0) ? lambda / (2.0 * xtx_diag(j)) : -lambda / (2.0 * xtx_diag(j));
+          x_new = (r_j > 0) ? lambda_j / (2.0 * xtx_diag(j)) : -lambda_j / (2.0 * xtx_diag(j));
         } else {
           x_new = 0.0;
         }

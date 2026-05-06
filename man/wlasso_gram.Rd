@@ -12,7 +12,8 @@ wlasso_gram(
   weak = T,
   refine = T,
   max_iter = 1000,
-  tolerance = 1e-06
+  tolerance = 1e-06,
+  penalty_factors = NULL
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ wlasso_gram(
 \item{max_iter}{The maximum number of iterations}
 
 \item{tolerance}{The convergence tolerance}
+
+\item{penalty_factors}{A nonnegative vector of length p that rescales the penalty for each parameter}
 }
 \value{
 beta The estimated coefficients

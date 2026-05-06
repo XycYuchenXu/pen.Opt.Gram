@@ -8,6 +8,7 @@
 #' @param refine Whether to perform debiasing on the support
 #' @param max_iter The maximum number of iterations
 #' @param tolerance The convergence tolerance
+#' @param penalty_factors A nonnegative vector of length p that rescales the penalty for each parameter
 #'
 #' @return beta The estimated coefficients
 #' @import Rcpp
@@ -30,11 +31,13 @@
 #' # Estimate coefficients with weak Lasso penalty
 #' beta_est <- wlasso_gram(G, g, lambda, weak = TRUE)
 wlasso_gram = function(G, g, lambda, beta0 = NULL, weak = T, refine = T,
-                       max_iter = 1000, tolerance = 1e-6){
+                       max_iter = 1000, tolerance = 1e-6, penalty_factors = NULL){
   if (is.null(beta0)) {
     p = nrow(G)
     beta0 = rep(0, p)
   }
+  if (is.null(penalty_factors)) {penalty_factors = rep(1, p)}
+  lambda = lambda * penalty_factors
   beta_est = lasso_row_cpp(G, g, lambda, beta0, weak, max_iter, tolerance)
 
   if (!weak && refine) {

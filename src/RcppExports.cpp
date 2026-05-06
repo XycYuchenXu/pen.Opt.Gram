@@ -30,14 +30,14 @@ BEGIN_RCPP
 END_RCPP
 }
 // lasso_row_cpp
-arma::rowvec lasso_row_cpp(const arma::mat& xtx, const arma::vec& xty_i, double lambda, const arma::rowvec& x0, bool weak, int max_iter, double tolerance);
+arma::rowvec lasso_row_cpp(const arma::mat& xtx, const arma::vec& xty_i, const arma::rowvec& lambda, const arma::rowvec& x0, bool weak, int max_iter, double tolerance);
 RcppExport SEXP _pen_Opt_Gram_lasso_row_cpp(SEXP xtxSEXP, SEXP xty_iSEXP, SEXP lambdaSEXP, SEXP x0SEXP, SEXP weakSEXP, SEXP max_iterSEXP, SEXP toleranceSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::mat& >::type xtx(xtxSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type xty_i(xty_iSEXP);
-    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< const arma::rowvec& >::type lambda(lambdaSEXP);
     Rcpp::traits::input_parameter< const arma::rowvec& >::type x0(x0SEXP);
     Rcpp::traits::input_parameter< bool >::type weak(weakSEXP);
     Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
